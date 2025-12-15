@@ -1,0 +1,251 @@
+/* ========== GLOBAL APP BACKGROUND ========== */
+
+QMainWindow, QWidget#LoginWindow, QWidget#ProjectCentral {
+    background-color: #1F1F25;
+    color: #E5E7F0;
+    font-family: "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Remove ugly white backgrounds from item views */
+QListView, QListWidget, QTreeView, QTableView {
+    background-color: #2A2D34;
+    border: none;
+    color: #E5E7F0;
+    selection-background-color: #3C3F4A;
+    selection-color: #FFFFFF;
+}
+
+/* Scrollbars (optional) */
+QScrollBar:vertical, QScrollBar:horizontal {
+    background: #2A2D34;
+    border: none;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #434654;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {
+    background: #55586A;
+}
+
+/* ========== LOGIN WINDOW ========== */
+
+QWidget#LoginWindow {
+    border-radius: 24px;
+}
+
+QLabel#LogoLabel {
+    background: transparent;
+}
+
+QLabel#StatusLabel {
+    color: #FF6A7A;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+QLabel#VersionLabel {
+    color: #8C8F9A;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+QWidget#FormWrapper {
+    max-width: 520px;
+}
+
+/* pill inputs on login */
+QLineEdit#LoginLineEdit {
+    background-color: #2A2D34;
+    border: 1px solid #3A3D46;
+    border-radius: 24px;
+    padding: 12px 18px;
+    color: #E5E7F0;
+    font-size: 14px;
+}
+
+QLineEdit#LoginLineEdit::placeholder {
+    color: #A3A7B3;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+QLineEdit#LoginLineEdit:focus {
+    border: 1px solid #8D63FF;
+    outline: none;
+}
+
+/* Connect button */
+QPushButton#ConnectButton {
+    background-color: #8D63FF;
+    color: #FFFFFF;
+    border-radius: 24px;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 8px 28px;
+    border: none;
+}
+
+QPushButton#ConnectButton:hover {
+    background-color: #9A71FF;
+}
+
+QPushButton#ConnectButton:pressed {
+    background-color: #7B54EA;
+}
+
+/* ========== PROJECT WINDOW ========== */
+
+QWidget#ProjectCentral {
+    background-color: #1F1F25;
+}
+
+QLabel#WelcomeLabel {
+    color: #FFFFFF;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+QLabel#SectionLabel {
+    color: #FFFFFF;
+    font-size: 18px;
+    margin-top: 8px;
+}
+
+QLabel#StatusLabelProjects {
+    color: #A3A7B3;
+    font-size: 12px;
+}
+
+/* big dark card behind project list */
+QFrame#ProjectsContainer {
+    background-color: #262933;
+    border-radius: 24px;
+}
+
+/* Project list itself */
+QListWidget#ProjectList {
+    background-color: transparent;
+    border: none;
+}
+
+/* Project list items (text-only fall-back if not using ProjectCard widget) */
+QListWidget#ProjectList::item {
+    background-color: transparent;
+    border-radius: 16px;
+    margin: 4px 0;
+    padding: 10px 12px;
+    color: #E5E7F0;
+}
+
+QListWidget#ProjectList::item:selected {
+    background-color: transparent;
+}
+
+/* Header buttons */
+QPushButton#RefreshButton {
+    background-color: transparent;
+    color: #C9B8FF;
+    border: 1px solid #7B61FF;
+    border-radius: 16px;
+    padding: 4px 14px;
+    font-size: 13px;
+}
+
+/* New Project button bottom-right */
+QPushButton#NewProjectButton {
+    background-color: #8D63FF;
+    color: #FFFFFF;
+    border-radius: 20px;
+    padding: 8px 22px;
+    font-size: 14px;
+    border: none;
+}
+
+QPushButton#NewProjectButton:hover {
+    background-color: #9A71FF;
+}
+
+/* ========== PROJECT CARD WIDGET ========== */
+
+QFrame#CardBackground {
+    background-color: #2A2D34;
+    border-radius: 18px;
+}
+
+QFrame#CardBackground[hover="true"] {
+    background-color: #343844;
+}
+
+QFrame#AccentStripe {
+    border-radius: 3px;
+}
+
+QLabel#ProjectLogo {
+    background: transparent;
+}
+
+QLabel#ProjectTitle {
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QLabel#ProjectMeta {
+    color: #B0B3C0;
+    font-size: 13px;
+}
+
+QLabel#ProjectId {
+    color: #6E7280;
+    font-size: 12px;
+}
+
+QFrame#RightContainer {
+    background-color: #33363F;
+    border-radius: 16px;
+}
+
+/* Card buttons */
+QPushButton#BrowseButton,
+QPushButton#AssembleButton {
+    background-color: transparent;
+    color: #C9B8FF;
+    border: 2px solid #7B61FF;
+    border-radius: 18px;
+    padding: 4px 18px;
+    font-size: 13px;
+}
+
+QPushButton#BrowseButton:hover,
+QPushButton#AssembleButton:hover {
+    background-color: rgba(123, 97, 255, 0.15);
+}
+
+QPushButton#TrashButton {
+    background-color: #FF4E6A;
+    border-radius: 20px;
+    border: none;
+    color: #FFFFFF;
+    font-size: 18px;
+}
+
+QPushButton#MenuButton {
+    background-color: transparent;
+    border-radius: 20px;
+    border: none;
+    color: #9DA0AE;
+    font-size: 20px;
+}
+
+QPushButton#TrashButton:hover {
+    background-color: #FF3355;
+}
+
+QPushButton#MenuButton:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
