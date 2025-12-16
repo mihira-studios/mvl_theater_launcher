@@ -17,9 +17,12 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QFrame,
     QSizePolicy,
+    QStackedWidget,
 )
 
+from launcher.ui.card_list_page import CardListPage
 from launcher.ui.widgets.project_card import ProjectCard
+from launcher.ui.widgets.entity_card import CardButtonSpec, EntityCard
 from launcher.domain.project import Project
 
 if TYPE_CHECKING:
@@ -28,14 +31,41 @@ if TYPE_CHECKING:
     from launcher.domain.user import User
 
 
+
+class ClickableLabel(QLabel):
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event):
+        if not self.isEnabled():
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+
 # ---------------- Worker ----------------
 
+class LoadSequencesWorker(QThread):
+    success = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+    def __init__(self, ctx, project_id: str, parent=None):
+        super().__init__(parent)
+        self._ctx = ctx
+        self._project_id = project_id
+
+    def run(self):
+        try:
+            seqs = self._ctx.project_service.list_sequences(self._project_id)
+            self.success.emit(seqs)
+        except Exception as e:
+            self.error.emit(str(e))
 
 class LoadProjectsWorker(QThread):
     """
     Background worker to load projects from the ProjectService.
     """
-    success = pyqtSignal(object)  # List[Project]
+    success = pyqtSignal(object)
     error = pyqtSignal(str)
 
     def __init__(self, app_context: AppContext, parent=None):
@@ -127,9 +157,26 @@ class MainWindow(QMainWindow):
         outer.addLayout(header)
 
         # ----- Section title -----
-        self.section_label = QLabel("Projects", central)
-        self.section_label.setObjectName("SectionLabel")
-        outer.addWidget(self.section_label)
+        crumb_row = QHBoxLayout()
+        crumb_row.setSpacing(8)
+
+        self.crumb_projects = ClickableLabel("Projects", central)
+        self.crumb_projects.setObjectName("SectionCrumb")
+
+        self.crumb_sep = QLabel("›", central)
+        self.crumb_sep.setObjectName("SectionCrumbSep")
+
+        self.crumb_current = QLabel("", central)   # current page (not clickable)
+        self.crumb_current.setObjectName("SectionCrumbCurrent")
+
+        self.crumb_projects.clicked.connect(self._back_to_projects)
+
+        crumb_row.addWidget(self.crumb_projects)
+        crumb_row.addWidget(self.crumb_sep)
+        crumb_row.addWidget(self.crumb_current)
+        crumb_row.addStretch(1)
+
+        outer.addLayout(crumb_row)
 
         # ----- Status label -----
         self.status_label = QLabel("", central)
@@ -148,12 +195,13 @@ class MainWindow(QMainWindow):
         container_layout.setContentsMargins(24, 24, 24, 24)
         container_layout.setSpacing(12)
 
-        # Projects list
-        self.project_list = QListWidget(self.projects_container)
-        self.project_list.setObjectName("ProjectList")
-        self.project_list.setSpacing(8)  # space between cards
+        
+        self.stack = QStackedWidget(self.projects_container)
+        self.stack.setAutoFillBackground(False)
+        self.stack.setObjectName("MainStack")
+        self.stack.currentChanged.connect(lambda _: self._update_breadcrumb())
+        container_layout.addWidget(self.stack)
 
-        container_layout.addWidget(self.project_list)
         outer.addWidget(self.projects_container)
 
         # ----- Bottom bar -----
@@ -169,14 +217,57 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
-    # ---------------- Project loading ----------------
+        self._build_pages()
+
+    def _update_breadcrumb(self):
+        on_projects = (self.stack.currentWidget() == self.projects_page)
+
+        if on_projects:
+            self.crumb_projects.setText("Projects")
+            self.crumb_sep.setVisible(False)
+            self.crumb_current.setVisible(False)
+            # optional: disable clicking when already on projects
+            self.crumb_projects.setEnabled(False)
+        else:
+            # sequences page
+            proj = None
+            if getattr(self, "_current_project_id", None):
+                proj = self._projects_by_id.get(self._current_project_id)
+
+            self.crumb_projects.setEnabled(True)
+            self.crumb_sep.setVisible(True)
+            self.crumb_current.setVisible(True)
+
+            self.crumb_projects.setText("Projects")
+            self.crumb_current.setText(proj.name if proj else "Sequences")
+
+
+    def _on_section_clicked(self):
+        # example: if you're on sequences, go back to projects
+        if self.stack.currentWidget() == self.sequences_page:
+            self._back_to_projects()
+
 
     def _set_loading(self, loading: bool, message: str = ""):
         enabled = not loading
         self.refresh_button.setEnabled(enabled)
         self.new_project_button.setEnabled(enabled)
-        self.project_list.setEnabled(enabled)
+        self.stack.setEnabled(enabled)
         self.status_label.setText(message)
+
+    def _load_sequences(self, project_id: str):
+        # Avoid overlapping loads
+        if getattr(self, "_seq_worker", None) is not None and self._seq_worker.isRunning():
+            return
+
+        self._current_project_id = project_id
+        self._set_loading(True, "Loading sequences...")
+
+        self._seq_worker = LoadSequencesWorker(self._ctx, project_id, self)
+        self._seq_worker.success.connect(self._handle_sequences_loaded)
+        self._seq_worker.error.connect(self._handle_sequences_error)
+        self._seq_worker.finished.connect(self._cleanup_seq_worker)
+        self._seq_worker.start()
 
     def _load_projects(self):
         #Avoid overlapping loads
@@ -195,46 +286,76 @@ class MainWindow(QMainWindow):
         # dummy = self._make_dummy_projects()
         # self._handle_projects_loaded(dummy)
 
+    def _make_project_card(self, project: Project) -> EntityCard:
+        card = EntityCard(
+            entity_id=project.id,
+            title=project.name,
+            meta_text=f"sequences {project.sequence_count} • shots {project.shot_count}",
+            id_text=f"ID: {project.code}",
+            icon="project.png",
+            buttons=[
+                CardButtonSpec("browse", "Browse", qss_object="PrimaryButton"),
+                CardButtonSpec("assemble", "Assemble", qss_object="PrimaryButton"),
+                CardButtonSpec("delete", text="🗑", qss_object="DangerIconButton", fixed_size=(40, 40)),
+                CardButtonSpec("menu", text="⋯", qss_object="IconButton", fixed_size=(40, 40)),
+            ],
+        )
+        return card
+
+    def _make_sequence_card(self, seq) -> EntityCard:
+        card = EntityCard(
+            entity_id=seq.id,
+            title=f"{seq.code} {seq.name or ''}".strip(),
+            meta_text=f"status {seq.status}",
+            id_text=f"ID: {seq.id}",
+            icon="sequence.png",
+            buttons=[
+                CardButtonSpec("open", "Open", qss_object="PrimaryButton"),
+                CardButtonSpec("delete", text="🗑", qss_object="DangerIconButton", fixed_size=(40, 40)),
+            ],
+        )
+        return card
+
+    def _handle_sequences_loaded(self, sequences):
+        self._set_loading(False, "")
+
+        sequences = list(sequences or [])
+        if not sequences:
+            self.status_label.setText("No sequences available.")
+            self.sequences_page.set_items([])
+        else:
+            self.status_label.setText(f"Loaded {len(sequences)} sequence(s).")
+            self.sequences_page.set_items(sequences)
+
+        self.stack.setCurrentWidget(self.sequences_page)
+
+    def _handle_sequences_error(self, msg: str):
+        self._set_loading(False, msg)
+
+    def _cleanup_seq_worker(self):
+        self._seq_worker = None
 
     def _handle_projects_loaded(self, projects: List[Project]):
-        print("DEBUG: _handle_projects_loaded called with", len(projects), "projects")
-
         self._projects = list(projects or [])
         self._projects_by_id = {p.id: p for p in self._projects}
 
-        self.project_list.clear()
-
         if not self._projects:
             self.status_label.setText("No projects available.")
-            print("DEBUG: project_list.count() =", self.project_list.count())
+            self.projects_page.set_items([])
             return
 
         self.status_label.setText(f"Loaded {len(self._projects)} project(s).")
-
-        for project in self._projects:
-            item = QListWidgetItem(self.project_list)
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-
-            card = ProjectCard(
-                project_id=project.id,
-                title=project.name,
-                scenes_sets_text=project.description or "",
-                id_text=f"ID {project.id}",
-                accent_color="#4AC0FF",
-                icon="app_icon.png",
-            )
-
-            card.browse_clicked.connect(self._on_card_browse)
-            card.assemble_clicked.connect(self._on_card_assemble)
-            card.delete_clicked.connect(self._on_card_delete)
-            card.menu_clicked.connect(self._on_card_menu)
-
-            item.setSizeHint(card.sizeHint())
-            self.project_list.addItem(item)
-            self.project_list.setItemWidget(item, card)
-
-        print("DEBUG: project_list.count() =", self.project_list.count())
-
+        self.projects_page.set_items(self._projects)
+    
+    def _on_projects_action(self, project_id: str, action: str, project_obj):
+        if action == "browse":
+            self._load_sequences(project_id)  
+        elif action == "assemble":
+            self._on_card_assemble(project_id)
+        elif action == "delete":
+            self._on_card_delete(project_id)
+        elif action == "menu":
+            self._on_card_menu(project_id)
 
     def _handle_projects_error(self, message: str):
         # This slot can be called even as window is closing, so be defensive
@@ -252,8 +373,6 @@ class MainWindow(QMainWindow):
 
     def _cleanup_load_worker(self):
         self._load_worker = None
-
-    # ---------------- Card signal handlers ----------------
 
     def _get_project(self, project_id: str) -> Project | None:
         return self._projects_by_id.get(project_id)
@@ -299,8 +418,6 @@ class MainWindow(QMainWindow):
         # TODO: show context menu / options dialog
         QMessageBox.information(self, "Menu", f"(Not implemented) Menu for: {project.name}")
 
-    # ---------------- Cleanup ----------------
-
     def closeEvent(self, event):
         # Safely stop worker to avoid signals firing after widgets are gone
         if self._load_worker and self._load_worker.isRunning():
@@ -312,3 +429,36 @@ class MainWindow(QMainWindow):
             self._load_worker.wait(200)
         self._load_worker = None
         super().closeEvent(event)
+
+    def _build_pages(self):
+        self.projects_page = CardListPage(make_card=self._make_project_card, show_back=False)
+        self.sequences_page = CardListPage(make_card=self._make_sequence_card, show_back=True)
+
+        self.stack.addWidget(self.projects_page)
+        self.stack.addWidget(self.sequences_page)
+
+        self.projects_page.action.connect(self._on_projects_action)
+        self.sequences_page.action.connect(self._on_sequences_action)
+        self.sequences_page.back_requested.connect(self._back_to_projects)
+
+    def _show_projects(self):
+        self.stack.setCurrentWidget(self.projects_page)
+
+    def _show_sequences(self, project_id: str):
+        self._current_project_id = project_id
+        self.stack.setCurrentWidget(self.sequences_page)
+
+    def _on_sequences_action(self, sequence_id: str, action: str, sequence_obj):
+        if action == "open":
+            # open sequence details window/page if you want
+            print("Open sequence", sequence_id)
+        elif action == "delete":
+            print("Delete sequence", sequence_id)
+
+    def _refresh_current_page(self):
+        current = self.stack.currentWidget()
+        if hasattr(current, "refresh"):
+            current.refresh()
+
+    def _back_to_projects(self):
+        self._show_projects()

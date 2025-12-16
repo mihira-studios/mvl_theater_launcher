@@ -7,13 +7,15 @@ QMainWindow, QWidget#LoginWindow, QWidget#ProjectCentral {
 }
 
 /* Remove ugly white backgrounds from item views */
-QListView, QListWidget, QTreeView, QTableView {
+QStackWidget, QListView, QListWidget, QTreeView, QTableView {
     background-color: #2A2D34;
     border: none;
     color: #E5E7F0;
     selection-background-color: #3C3F4A;
     selection-color: #FFFFFF;
 }
+
+
 
 /* Scrollbars (optional) */
 QScrollBar:vertical, QScrollBar:horizontal {
@@ -126,6 +128,29 @@ QFrame#ProjectsContainer {
     background-color: #262933;
     border-radius: 24px;
 }
+
+
+
+#MainStack {
+    background-color: transparent;
+}
+
+#MainStack > QWidget {
+    background-color: transparent;
+}
+
+#CardScroll {
+    background-color: transparent;
+}
+
+#CardScroll > QWidget {
+    background-color: transparent;
+}
+
+#CardScrollHost {
+    background-color: transparent;
+}
+
 
 /* Project list itself */
 QListWidget#ProjectList {
@@ -249,3 +274,22 @@ QPushButton#TrashButton:hover {
 QPushButton#MenuButton:hover {
     background-color: rgba(255, 255, 255, 0.06);
 }
+
+QLabel#SectionCrumb {
+    color: #B0B3C0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QLabel#SectionCrumbCurrent {
+    color: #FFFFFF;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QLabel#SectionCrumbSep {
+    color: #6E7280;
+    font-size: 18px;
+    font-weight: 600;
+}
+

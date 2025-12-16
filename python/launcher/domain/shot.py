@@ -1,10 +1,13 @@
 # domain/project.py
 from dataclasses import dataclass
 
+
 @dataclass
-class Project:
+class Shot:
     id: str
+    project_id: str
+    sequence_id: str
     name: str
     code: str
-    sequence_count: int
-    shot_count: int
+    status: str
+    meta: dict

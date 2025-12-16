@@ -10,4 +10,5 @@ class AppContext:
         client = HttpClient()
         self.auth_service = AuthService()
         self.project_service = ProjectService(self.auth_service, client)
+        self.sequence_service = ProjectService(self.auth_service, client)
         self.launch_service = LaunchService(self.auth_service)
