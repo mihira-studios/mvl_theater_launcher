@@ -1,5 +1,14 @@
 MVL Theater Launcher
 
+enviroment variables need to be set
+
+MVL_DOMAIN  "ip addres"
+KC_REALM    "keycloak releam"
+KC_CLIENT_ID "keycloak client id"
+
+THEATER_EXECUTABLE "unreal executable for theater"
+THEATER_UPROJECT_TEMPLATE "unreal uproject template path"
+
 A desktop launcher application for Unreal Engine–based productions, inspired by the Epic Games Launcher.
 Built with Python + PyQt, secured with Keycloak, and backed by FastAPI.
 
