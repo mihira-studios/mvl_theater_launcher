@@ -159,8 +159,14 @@ class LoginWindow(QWidget):
         self._worker.start()
 
     def _handle_login_success(self, user: User):
+
+        mins = self._ctx.auth_service.access_token_minutes_left()
+        print(f"Access token minutes left: {mins:.1f}")
+
+        self._set_ui_enabled(True)
         self.status_label.setText("")
-        # callback: open main window + close this one (handled in main.py)
+        self.password_input.clear()
+
         self._on_login_success(user, self)
 
     def _handle_login_error(self, message: str):

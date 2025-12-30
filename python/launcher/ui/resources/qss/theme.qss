@@ -194,6 +194,9 @@ QPushButton#NewProjectButton {
 QPushButton#NewProjectButton:hover {
     background-color: #9A71FF;
 }
+QPushButton#RefreshButton:hover {
+    background-color: #9A71FF;
+}
 
 /* ========== PROJECT CARD WIDGET ========== */
 
@@ -293,3 +296,38 @@ QLabel#SectionCrumbSep {
     font-weight: 600;
 }
 
+QPushButton#LogoutButton {
+    background-color: transparent;
+    color: #C9B8FF;
+    border: 1px solid #7B61FF;
+    border-radius: 16px;
+    padding: 4px 14px;
+    font-size: 13px;
+}
+
+QPushButton#LogoutButton:hover {
+    background-color: #9A71FF;
+}
+
+QToolButton#UserInitialButton {
+    border: none;
+    border-radius: 18px;
+    min-width: 36px;
+    min-height: 36px;
+    font-weight: 800;
+    color: #ffffffff;
+    background-color: #9A71FF;
+}
+
+QToolButton#UserInitialButton:hover {
+    background-color: #9A71FF;
+}
+
+QToolButton#UserInitialButton:pressed {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+QToolButton#UserInitialButton::menu-indicator {
+    image: none;
+    width: 0px;
+}

@@ -1,6 +1,7 @@
 import requests
+from ..launcher.config import DOMAIN
 
-token_url = "http://10.100.1.30:8080/realms/MIHIRA-REALM/protocol/openid-connect/token"
+token_url = "{DOMAIN}:8080/realms/MIHIRA-REALM/protocol/openid-connect/token"
 
 payload = {
     "grant_type": "password",

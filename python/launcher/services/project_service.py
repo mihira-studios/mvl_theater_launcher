@@ -14,18 +14,22 @@ class ProjectService:
 
     def list_my_projects(self) -> list[Project]:
         headers = self.auth.auth_headers()
-        resp = self.client.get("auth/me/projects", headers=headers)
+        resp = self.client.get_with_auth_retry(self.auth, "auth/me/projects")
         resp.raise_for_status()
         items = resp.json()
 
         projects: list[Project] = []
         for p in items:
-            count_resp = self.client.get(f"projects/{p['id']}/sequences/count", headers=headers)
+            count_resp = self.client.get_with_auth_retry(
+                self.auth, f"projects/{p['id']}/sequences/count"
+            )
             count_resp.raise_for_status()
             seq_count = count_resp.json().get("sequence_count", 0)
 
             # shots count (summed from Sequence.meta["shots"])
-            shot_resp = self.client.get(f"projects/{p['id']}/shots/count", headers=headers)
+            shot_resp = self.client.get_with_auth_retry(
+                self.auth, f"projects/{p['id']}/shots/count"
+            )
             shot_resp.raise_for_status()
             shot_count = shot_resp.json().get("shot_count", 0)
 
@@ -42,10 +46,7 @@ class ProjectService:
         return projects
     
     def list_sequences(self, project_id: str | UUID) -> list[Sequence]:
-        headers = self.auth.auth_headers()
-
-        # endpoint suggestion: /projects/{project_id}/sequences
-        resp = self.client.get(f"projects/{project_id}/sequences", headers=headers)
+        resp = self.client.get_with_auth_retry(self.auth, f"projects/{project_id}/sequences")
         resp.raise_for_status()
         items = resp.json()
 
@@ -62,15 +63,15 @@ class ProjectService:
         ]
 
     def list_shots(self, project_id: str | UUID, sequence_id: str | UUID) -> list[Shot]:
-        headers = self.auth.auth_headers()
-
-        # endpoint suggestion: /projects/{project_id}/sequences
-        resp = self.client.get(f"/shots", headers=headers)
+       
+        resp = self.client.get_with_auth_retry(
+            self.auth, f"projects/{project_id}/sequences/{sequence_id}/shots"
+        )
         resp.raise_for_status()
         items = resp.json()
 
         return [
-            Sequence(
+            Shot(
                 id=s["id"],
                 project_id=s["project_id"],
                 sequence_id=s["sequence_id"],

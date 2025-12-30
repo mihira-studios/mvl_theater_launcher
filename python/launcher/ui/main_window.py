@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os, sys
 from typing import TYPE_CHECKING, List, Dict
 
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QMainWindow,
+    QMenu,
+    QWidgetAction,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -18,7 +21,10 @@ from PyQt6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QStackedWidget,
+    QToolButton,
 )
+
+from PyQt6.QtGui import QIcon
 
 from launcher.ui.card_list_page import CardListPage
 from launcher.ui.widgets.project_card import ProjectCard
@@ -30,8 +36,6 @@ if TYPE_CHECKING:
     from launcher.domain.project import Project
     from launcher.domain.user import User
 
-
-
 class ClickableLabel(QLabel):
     clicked = pyqtSignal()
 
@@ -41,9 +45,6 @@ class ClickableLabel(QLabel):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
-
-
-# ---------------- Worker ----------------
 
 class LoadSequencesWorker(QThread):
     success = pyqtSignal(list)
@@ -60,7 +61,7 @@ class LoadSequencesWorker(QThread):
             self.success.emit(seqs)
         except Exception as e:
             self.error.emit(str(e))
-
+        
 class LoadProjectsWorker(QThread):
     """
     Background worker to load projects from the ProjectService.
@@ -79,25 +80,25 @@ class LoadProjectsWorker(QThread):
         except Exception as exc:
             self.error.emit(str(exc))
 
-
-# ---------------- Main Window ----------------
-
-
 class MainWindow(QMainWindow):
     """
     Projects window styled via global theme.qss.
 
     Uses:
-    - Welcome label with user's name/email
-    - Projects list rendered as ProjectCard widgets inside a QListWidget
-    - New Project / Refresh buttons
+        - Welcome label with user's name/email
+        - Projects list rendered as ProjectCard widgets inside a QListWidget
+        - New Project / Refresh buttons
     """
 
-    def __init__(self, app_context: AppContext, user: User, parent=None):
+    def __init__(self, app_context: AppContext, user: User, on_logout, parent=None):
         super().__init__(parent)
 
         self._ctx = app_context
+        self._ctx.session_expired.connect(self._on_session_expired)
+        
         self._user = user
+
+        self._on_logout = on_logout
 
         self._projects: List[Project] = []
         self._projects_by_id: Dict[str, Project] = {}
@@ -138,7 +139,8 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(32, 24, 32, 24)
         outer.setSpacing(16)
 
-        # ----- Header row: welcome + refresh button -----
+        initial = (self._user.display_name or self._user.email or "?").strip()[:1].upper()
+
         header = QHBoxLayout()
         header.setSpacing(8)
 
@@ -153,6 +155,18 @@ class MainWindow(QMainWindow):
         self.refresh_button.setObjectName("RefreshButton")
         self.refresh_button.clicked.connect(self._load_projects)
         header.addWidget(self.refresh_button)
+
+        self.user_button = QToolButton(central)
+        self.user_button.setObjectName("UserInitialButton")
+        self.user_button.setText(initial)
+        self.user_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.user_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.user_button.setFixedSize(36, 36)  # round size
+
+        self.user_menu = self._build_user_menu()
+        self.user_button.setMenu(self.user_menu)
+
+        header.addWidget(self.user_button)
 
         outer.addLayout(header)
 
@@ -219,6 +233,40 @@ class MainWindow(QMainWindow):
 
         self._build_pages()
 
+    def _logout_clicked(self):
+        self._on_logout("Logged out.", self)
+
+    def _build_user_menu(self) -> QMenu:
+        menu = QMenu(self)
+        menu.setObjectName("UserMenu")
+
+        # Header widget inside menu
+        card = QWidget(menu)
+        card.setObjectName("UserMenuCard")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(4)
+
+        name = self._user.display_name or self._user.email
+        name_lbl = QLabel(name, card)
+        name_lbl.setObjectName("UserMenuName")
+
+        email_lbl = QLabel(self._user.email, card)
+        email_lbl.setObjectName("UserMenuEmail")
+
+        layout.addWidget(name_lbl)
+        layout.addWidget(email_lbl)
+
+        wa = QWidgetAction(menu)
+        wa.setDefaultWidget(card)
+        menu.addAction(wa)
+
+        menu.addSeparator()
+
+        signout = menu.addAction("Sign out")
+        signout.triggered.connect(self._logout_clicked)  # your existing logout handler
+        return menu
+
     def _update_breadcrumb(self):
         on_projects = (self.stack.currentWidget() == self.projects_page)
 
@@ -241,12 +289,10 @@ class MainWindow(QMainWindow):
             self.crumb_projects.setText("Projects")
             self.crumb_current.setText(proj.name if proj else "Sequences")
 
-
     def _on_section_clicked(self):
         # example: if you're on sequences, go back to projects
         if self.stack.currentWidget() == self.sequences_page:
             self._back_to_projects()
-
 
     def _set_loading(self, loading: bool, message: str = ""):
         enabled = not loading
@@ -281,10 +327,6 @@ class MainWindow(QMainWindow):
         self._load_worker.error.connect(self._handle_projects_error)
         self._load_worker.finished.connect(self._cleanup_load_worker)
         self._load_worker.start()
-        self._set_loading(False, "")
-        
-        # dummy = self._make_dummy_projects()
-        # self._handle_projects_loaded(dummy)
 
     def _make_project_card(self, project: Project) -> EntityCard:
         card = EntityCard(
@@ -336,6 +378,7 @@ class MainWindow(QMainWindow):
         self._seq_worker = None
 
     def _handle_projects_loaded(self, projects: List[Project]):
+        self._set_loading(False, "")
         self._projects = list(projects or [])
         self._projects_by_id = {p.id: p for p in self._projects}
 
@@ -357,16 +400,12 @@ class MainWindow(QMainWindow):
         elif action == "menu":
             self._on_card_menu(project_id)
 
+        self._projects_obj = project_obj
+
     def _handle_projects_error(self, message: str):
-        # This slot can be called even as window is closing, so be defensive
-        try:
-            self._projects = []
-            self._projects_by_id = {}
-            if self.project_list:
-                self.project_list.clear()
-        except RuntimeError:
-            # Underlying C++ widget may already be deleted if app is exiting
-            return
+       
+        self._set_loading(False, "")
+        QMessageBox.critical(self, "Error loading projects", message)
 
         self._set_loading(False, "")
         QMessageBox.critical(self, "Error loading projects", message)
@@ -449,9 +488,24 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.sequences_page)
 
     def _on_sequences_action(self, sequence_id: str, action: str, sequence_obj):
+        env = os.environ.copy()
+        env["PROJECTS_ROOT_DIR"] = r"J:"
+
+        # Pick the right fields for your domain objects:
+        env["MVL_PROJECT"] = "tg63" #getattr(self._projects_obj, "code", None) or str(getattr(self._projects_obj, "id", ""))
+        env["MVL_TYPE"] = "sequences"
+        env["MVL_SCOPE"] = "sq01"#getattr(sequence_obj, "code", None) or str(getattr(sequence_obj, "id", ""))
+        env["MVL_CONTAINER"] = "master"
+        env["MVL_TASK"] = "layout"
+        env["MVL_STEP"] = "lay"
+
         if action == "open":
-            # open sequence details window/page if you want
-            print("Open sequence", sequence_id)
+            if os.environ.get("THEATER_EXECUTABLE") and os.environ.get("THEATER_UPROJECT_TEMPLATE"):
+                ue_editor = os.path.join(os.environ.get("THEATER_HOME")) #, r"Engine\Binaries\Win64\UnrealEditor.exe") 
+                uproject = os.environ.get("THEATER_UPROJECT_TMEPLATE") 
+                service = self._ctx.theater_service.launch(ue_editoclr,uproject,["-MVLEditor"], env=env)
+            else:
+                print(f"THEATER_EXECUTABLE or THEATER_UPROJECT_TMEPLATE env not set")
         elif action == "delete":
             print("Delete sequence", sequence_id)
 
@@ -462,3 +516,8 @@ class MainWindow(QMainWindow):
 
     def _back_to_projects(self):
         self._show_projects()
+
+    def _on_session_expired(self, msg: str):
+        QMessageBox.information(self, "Session expired", mg)
+        self._ctx.auth_service.logout()
+        self._on_logout(msg, self)

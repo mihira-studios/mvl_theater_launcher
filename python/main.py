@@ -1,5 +1,4 @@
 # main.py
-
 import sys
 from PyQt6.QtWidgets import QApplication
 
@@ -8,24 +7,47 @@ from launcher.ui.login_window import LoginWindow
 from launcher.ui.main_window import MainWindow
 from launcher.ui.theme import apply_global_theme
 
+
 def main():
     app = QApplication(sys.argv)
     apply_global_theme(app)
 
     ctx = AppContext()
 
-    main_window_holder = {"window": None}  # small trick to keep a ref
+    holder = {"login": None, "main": None}
 
-    def open_main_window(user, login_win):
-        # Create & show MainWindow, close LoginWindow from inside
-        win = MainWindow(ctx, user)
+    def show_login(message: str = ""):
+        # hide main if present
+        if holder["main"] is not None:
+            holder["main"].hide()
+            holder["main"] = None
+
+        # recreate login if closed
+        if holder["login"] is None:
+            holder["login"] = LoginWindow(ctx, on_login_success=open_main_window)
+
+        if message:
+            holder["login"].status_label.setText(message)  # optional
+        holder["login"].show()
+        holder["login"].raise_()
+        holder["login"].activateWindow()
+
+    def on_logout(reason: str, main_window: MainWindow):
+        ctx.auth_service.logout()
+        # don't close the app window chain; just return to login
+        show_login(reason or "Logged out.")
+
+    def open_main_window(user, login_win: LoginWindow):
+        # Hide (don't close) login so we can show it again on logout
+        login_win.hide()
+
+        win = MainWindow(ctx, user, on_logout=on_logout)  # <-- pass callback
         win.show()
-        main_window_holder["window"] = win  # keep reference to avoid GC
+        holder["main"] = win
+        holder["login"] = login_win  # keep ref
 
-        login_win.close()
-
-    login = LoginWindow(ctx, on_login_success=open_main_window)
-    login.show()
+    holder["login"] = LoginWindow(ctx, on_login_success=open_main_window)
+    holder["login"].show()
 
     sys.exit(app.exec())
 

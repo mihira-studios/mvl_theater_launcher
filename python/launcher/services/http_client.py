@@ -1,19 +1,34 @@
-# services/http_client.py
 import requests
-from launcher import config
 
+from launcher.services.auth_service import SessionExpired
+from launcher import config
 
 class HttpClient:
     def __init__(self, base_url: str | None = None):
-        self.base_url = base_url or config.FASTAPI_BASE_URL
-        self.session = requests.Session()
-        self.session.timeout = 10  # default
+        self.base_url = (base_url or config.FASTAPI_BASE_URL).rstrip("/")
 
-    def _url(self, path: str) -> str:
-        return self.base_url.rstrip("/") + "/" + path.lstrip("/")
+    def get(self, path: str, headers=None, timeout=10, **kwargs):
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        return requests.get(url, headers=headers, timeout=timeout, **kwargs)
 
-    def get(self, path: str, **kwargs):
-        return self.session.get(self._url(path), **kwargs)
+    def request(self, method: str, path: str, headers=None, timeout=10, **kwargs):
+        url = f"{self.base_url}/{path.lstrip('/')}"
+        return requests.request(method, url, headers=headers, timeout=timeout, **kwargs)
 
-    def post(self, path: str, **kwargs):
-        return self.session.post(self._url(path), **kwargs)
+    def get_with_auth_retry(self, auth, path: str, **kwargs):
+        # First try
+        resp = self.get(path, headers=auth.auth_headers(), **kwargs)
+        if resp.status_code != 401:
+            return resp
+
+        # Refresh + retry once
+        try:
+            auth.get_access_token()  # refresh if needed
+        except SessionExpired:
+            raise
+
+        resp2 = self.get(path, headers=auth.auth_headers(), **kwargs)
+        if resp2.status_code == 401:
+            auth.logout()
+            raise SessionExpired("Session expired. Please log in again.")
+        return resp2
