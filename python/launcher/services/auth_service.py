@@ -59,7 +59,6 @@ class AuthService:
             expires_at=datetime.utcnow() + timedelta(seconds=expires_in - 60),
         )
 
-        # Call your backend /me
         me = self._api_get("/auth/me").json()
 
         self._current_user = User(
@@ -110,9 +109,7 @@ class AuthService:
         token = self.get_access_token()
         resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
 
-        # If backend says token invalid, try one forced refresh once
         if resp.status_code == 401 and self._tokens and self._tokens.refresh_token:
-            # force refresh by expiring locally
             self._tokens.expires_at = datetime.utcnow() - timedelta(seconds=1)
             token = self.get_access_token()
             resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
