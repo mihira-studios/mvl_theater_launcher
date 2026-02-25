@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QApplication
 from launcher.ui.app_context import AppContext
 from launcher.ui.login_window import LoginWindow
 from launcher.ui.main_window import MainWindow
+from launcher.ui.script_breakdown_page import ScriptBreakdownPage
 from launcher.ui.theme import apply_global_theme
 
 

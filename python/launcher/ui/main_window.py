@@ -30,6 +30,7 @@ from launcher.ui.card_list_page import CardListPage
 from launcher.ui.widgets.project_card import ProjectCard
 from launcher.ui.widgets.entity_card import CardButtonSpec, EntityCard
 from launcher.domain.project import Project
+from python.launcher.ui.script_breakdown_page import ScriptBreakdownPage
 
 if TYPE_CHECKING:
     from launcher.ui.app_context import AppContext
@@ -224,6 +225,7 @@ class MainWindow(QMainWindow):
 
         self.new_project_button = QPushButton("New Project", central)
         self.new_project_button.setObjectName("NewProjectButton")
+        self.new_project_button.clicked.connect(self._show_script_breakdown)
         # TODO: connect to "create project" flow when ready
         bottom.addWidget(self.new_project_button)
 
@@ -232,6 +234,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self._build_pages()
+    
+    def _show_script_breakdown(self):
+        self.crumb_current.setText("Script Breakdown")
+        self.stack.setCurrentWidget(self.script_breakdown_page)
 
     def _logout_clicked(self):
         self._on_logout("Logged out.", self)
@@ -269,6 +275,7 @@ class MainWindow(QMainWindow):
 
     def _update_breadcrumb(self):
         on_projects = (self.stack.currentWidget() == self.projects_page)
+        on_script_breakdown = (self.stack.currentWidget() == self.script_breakdown_page)
 
         if on_projects:
             self.crumb_projects.setText("Projects")
@@ -472,6 +479,7 @@ class MainWindow(QMainWindow):
     def _build_pages(self):
         self.projects_page = CardListPage(make_card=self._make_project_card, show_back=False)
         self.sequences_page = CardListPage(make_card=self._make_sequence_card, show_back=True)
+        self.script_breakdown_page = ScriptBreakdownPage()
 
         self.stack.addWidget(self.projects_page)
         self.stack.addWidget(self.sequences_page)
@@ -479,6 +487,7 @@ class MainWindow(QMainWindow):
         self.projects_page.action.connect(self._on_projects_action)
         self.sequences_page.action.connect(self._on_sequences_action)
         self.sequences_page.back_requested.connect(self._back_to_projects)
+        self.script_breakdown_page.back_requested.connect(self._back_to_projects) 
 
     def _show_projects(self):
         self.stack.setCurrentWidget(self.projects_page)
