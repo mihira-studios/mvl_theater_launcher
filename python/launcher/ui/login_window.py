@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QWidget,
@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QSpacerItem,
     QSizePolicy,
+    QButtonGroup,
 )
 
 from launcher.util.helper import icon_path
@@ -92,6 +93,61 @@ class LoginWindow(QWidget):
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.setSpacing(12)
 
+        # mode switch (VM / Local) - VM selected by default
+        # mode switch: single container with sliding selector
+        btn_w, btn_h, gap = 220, 52, 8
+        container_w = btn_w * 2 + gap
+
+        mode_container = QWidget(form_wrapper)
+        mode_container.setFixedSize(container_w, btn_h)
+        mode_container.setObjectName("ModeSwitch")
+        mode_container.setStyleSheet(
+            "QWidget#ModeSwitch { background: rgba(0,0,0,0.06); border-radius: 26px; }"
+        )
+
+        # sliding selector (background for selected option)
+        self.selector = QWidget(mode_container)
+        self.selector.setFixedSize(btn_w, btn_h)
+        self.selector.setObjectName("ModeSelector")
+        self.selector.setStyleSheet(
+            "QWidget#ModeSelector { background: palette(highlight); border-radius: 24px; }"
+        )
+        self.selector.move(0, 0)
+
+        # option buttons sit above the selector and are visually transparent
+        self.vm_button = QPushButton("VM", mode_container)
+        self.vm_button.setCheckable(True)
+        self.vm_button.setFlat(True)
+        self.vm_button.setFixedSize(btn_w, btn_h)
+        self.vm_button.move(0, 0)
+
+        self.local_button = QPushButton("Local", mode_container)
+        self.local_button.setCheckable(True)
+        self.local_button.setFlat(True)
+        self.local_button.setFixedSize(btn_w, btn_h)
+        self.local_button.move(btn_w + gap, 0)
+
+        # behave like exclusive tabs
+        self._mode_group = QButtonGroup(self)
+        self._mode_group.setExclusive(True)
+        self._mode_group.addButton(self.vm_button)
+        self._mode_group.addButton(self.local_button)
+        self.vm_button.setChecked(True)
+
+        form_layout.addWidget(mode_container)
+
+        # prepare animation for selector
+        self._selector_anim = QPropertyAnimation(self.selector, b"pos", self)
+        self._selector_anim.setDuration(160)
+        self._selector_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        # IP input shown only when VM is selected
+        self.ip_input = QLineEdit(form_wrapper)
+        self.ip_input.setObjectName("LoginLineEdit")
+        self.ip_input.setPlaceholderText("IP ADDRESS")
+        self.ip_input.setVisible(True)
+        form_layout.addWidget(self.ip_input)
+
         self.username_input = QLineEdit(form_wrapper)
         self.username_input.setObjectName("LoginLineEdit")
         self.username_input.setPlaceholderText("USERNAME")
@@ -103,6 +159,12 @@ class LoginWindow(QWidget):
 
         form_layout.addWidget(self.username_input)
         form_layout.addWidget(self.password_input)
+
+        # connect mode change handler
+        self._mode_group.buttonClicked.connect(self._on_mode_changed)
+
+        # initial style update
+        self._update_mode_styles()
 
         center.addWidget(form_wrapper)
 
@@ -139,7 +201,48 @@ class LoginWindow(QWidget):
     def _set_ui_enabled(self, enabled: bool):
         self.username_input.setEnabled(enabled)
         self.password_input.setEnabled(enabled)
+        if hasattr(self, "ip_input"):
+            self.ip_input.setEnabled(enabled)
+        if hasattr(self, "vm_button"):
+            self.vm_button.setEnabled(enabled)
+        if hasattr(self, "local_button"):
+            self.local_button.setEnabled(enabled)
         self.connect_button.setEnabled(enabled)
+
+    def _on_mode_changed(self, button):
+        # show IP input only for VM mode and move the selector
+        try:
+            is_vm = button.text() == "VM"
+        except Exception:
+            is_vm = False
+
+        # toggle IP visibility
+        self.ip_input.setVisible(is_vm)
+
+        # compute target x for selector
+        btn_w = self.selector.width()
+        gap = self.local_button.x() - btn_w
+        target_x = 0 if is_vm else btn_w + gap
+
+        # animate selector
+        self._selector_anim.stop()
+        self._selector_anim.setStartValue(self.selector.pos())
+        self._selector_anim.setEndValue(QPoint(target_x, 0))
+        self._selector_anim.start()
+
+        # update button text colors
+        self._update_mode_styles()
+
+    def _update_mode_styles(self):
+        # selected button text is white, unselected gray
+        sel_style = "color: white; font-weight: 600;"
+        unsel_style = "color: white; font-weight: 600;"
+        if getattr(self.vm_button, "isChecked", lambda: False)():
+            self.vm_button.setStyleSheet(sel_style)
+            self.local_button.setStyleSheet(unsel_style)
+        else:
+            self.vm_button.setStyleSheet(unsel_style)
+            self.local_button.setStyleSheet(sel_style)
 
     def _on_connect_clicked(self):
         email = self.username_input.text().strip()
