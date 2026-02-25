@@ -30,7 +30,7 @@ from launcher.ui.card_list_page import CardListPage
 from launcher.ui.widgets.project_card import ProjectCard
 from launcher.ui.widgets.entity_card import CardButtonSpec, EntityCard
 from launcher.domain.project import Project
-from python.launcher.ui.script_breakdown_page import ScriptBreakdownPage
+from launcher.ui.script_breakdown_page import ScriptBreakdownPage
 
 if TYPE_CHECKING:
     from launcher.ui.app_context import AppContext
