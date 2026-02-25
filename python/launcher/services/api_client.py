@@ -18,7 +18,7 @@ class ApiClient:
 
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
-        resp = requests.request(method, url, headers=headers, timeout=10, **kwargs)
+        resp = requests.request(method, url, headers=headers, timeout=50, **kwargs)
 
         # If token invalid, try one refresh and retry once
         if resp.status_code == 401:

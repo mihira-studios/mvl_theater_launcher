@@ -97,10 +97,11 @@ class AuthService:
         data = resp.json()
         expires_in = int(data.get("expires_in", 3600))
 
+        refresh_early = min(60, max(0, expires_in//10))  # refresh at least 30s before expiry, but no more than 60s early
         self._tokens = AuthTokens(
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token", self._tokens.refresh_token),
-            expires_at=datetime.utcnow() + timedelta(seconds=expires_in - 60),
+            expires_at=datetime.utcnow() + timedelta(seconds=expires_in - refresh_early),
         )
         return self._tokens.access_token
 
