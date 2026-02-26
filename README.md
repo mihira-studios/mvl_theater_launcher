@@ -6,6 +6,18 @@ MVL_DOMAIN  "ip addres"
 KC_REALM    "keycloak releam"
 KC_CLIENT_ID "keycloak client id"
 
+# Launcher start scripts
+
+In the `python\theater_scripts` directory there are helper batch files used to start the
+launcher with the appropriate domain settings:
+
+* `start_local_launcher.bat` – clears `MVL_DOMAIN` so the app defaults to `localhost`.
+* `start_vm_launcher.bat` – sets `MVL_DOMAIN` to `10.100.0.85` (adjust the IP as needed)
+  before invoking the common `start_launcher.bat` script.
+
+These allow you to have separate shortcuts or Windows start menu entries depending on
+whether you want to connect to a local backend or a remote VM.
+
 THEATER_EXECUTABLE "unreal executable for theater"
 THEATER_UPROJECT_TEMPLATE "unreal uproject template path"
 
