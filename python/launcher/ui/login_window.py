@@ -93,11 +93,6 @@ class LoginWindow(QWidget):
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.setSpacing(12)
 
-        # mode switch (VM / Local) - VM selected by default
-        # mode switch: single container with sliding selector
-        btn_w, btn_h, gap = 220, 52, 8
-        container_w = btn_w * 2 + gap
-
         self.username_input = QLineEdit(form_wrapper)
         self.username_input.setObjectName("LoginLineEdit")
         self.username_input.setPlaceholderText("USERNAME")
