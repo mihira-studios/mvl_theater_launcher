@@ -145,17 +145,22 @@ class LoginWindow(QWidget):
         self.ip_input = QLineEdit(form_wrapper)
         self.ip_input.setObjectName("LoginLineEdit")
         self.ip_input.setPlaceholderText("IP ADDRESS")
+        # default value
+        self.ip_input.setText("10.100.0.85")
         self.ip_input.setVisible(True)
+        self.ip_input.textChanged.connect(self._update_connect_enabled)
         form_layout.addWidget(self.ip_input)
 
         self.username_input = QLineEdit(form_wrapper)
         self.username_input.setObjectName("LoginLineEdit")
         self.username_input.setPlaceholderText("USERNAME")
+        self.username_input.textChanged.connect(self._update_connect_enabled)
 
         self.password_input = QLineEdit(form_wrapper)
         self.password_input.setObjectName("LoginLineEdit")
         self.password_input.setPlaceholderText("PASSWORD")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.textChanged.connect(self._update_connect_enabled)
 
         form_layout.addWidget(self.username_input)
         form_layout.addWidget(self.password_input)
@@ -165,6 +170,8 @@ class LoginWindow(QWidget):
 
         # initial style update
         self._update_mode_styles()
+        # ensure connect button state reflects initial input values
+        #self._update_connect_enabled()
 
         center.addWidget(form_wrapper)
 
@@ -208,6 +215,15 @@ class LoginWindow(QWidget):
         if hasattr(self, "local_button"):
             self.local_button.setEnabled(enabled)
         self.connect_button.setEnabled(enabled)
+
+    def _update_connect_enabled(self):
+        """Enable the Connect button only if required fields are non-empty.
+        When IP field is visible (VM mode) it must also be non-empty.
+        """
+        ok = bool(self.username_input.text().strip() and self.password_input.text())
+        if ok and hasattr(self, "ip_input") and self.ip_input.isVisible():
+            ok = bool(self.ip_input.text().strip())
+        self.connect_button.setEnabled(ok)
 
     def _on_mode_changed(self, button):
         # show IP input only for VM mode and move the selector

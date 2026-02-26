@@ -22,8 +22,8 @@ if not defined PY (
 	exit /b 1
 )
 
-REM Start the python process (this will create its own console window)
-start "MVL Theatre" "%PY%" "%CD%\main.py"
+REM Start the python process directly so this console stays open and errors are visible
+"%PY%" "%CD%\main.py"
 
 popd
 exit /b 0

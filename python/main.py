@@ -54,4 +54,16 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        # show message box if GUI available
+        try:
+            from PyQt6.QtWidgets import QMessageBox, QApplication
+            app = QApplication.instance() or QApplication([])
+            QMessageBox.critical(None, "Launcher Error", str(exc))
+        except Exception:
+            pass
+        sys.exit(1)
