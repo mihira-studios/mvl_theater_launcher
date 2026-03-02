@@ -509,9 +509,25 @@ class MainWindow(QMainWindow):
         env["MVL_STEP"] = "lay"
 
         if action == "open":
+            import shutil
+
+            project_name = getattr(self._projects_obj, "name", None) or "MyProjectName"
+            UNREAL_PROJECTS_DIR = r"C:\dev\Unreal Projects"
+            TEMPLATE_DIR = os.path.join(UNREAL_PROJECTS_DIR, "MyProject")
+            target_dir = os.path.join(UNREAL_PROJECTS_DIR, project_name)
+            target_uproject = os.path.join(target_dir, f"{project_name}.uproject")
+
+            if not os.path.exists(target_uproject):
+                try:
+                    shutil.copytree(TEMPLATE_DIR, target_dir)
+                    os.rename(os.path.join(target_dir, "MyProject.uproject"), target_uproject)
+                except Exception as exc:
+                    QMessageBox.critical(self, "Copy failed", str(exc))
+                    return
+
             if os.environ.get("THEATER_EXECUTABLE") and os.environ.get("THEATER_UPROJECT_TEMPLATE"):
                 ue_editor = os.path.join(os.environ.get("THEATER_HOME")) #, r"Engine\Binaries\Win64\UnrealEditor.exe") 
-                uproject = os.environ.get("THEATER_UPROJECT_TEMPLATE") 
+                uproject = target_uproject   
                 service = self._ctx.theater_service.launch(ue_editor, uproject, ["-MVLEditor"], env=env)
             else:
                 print(f"THEATER_EXECUTABLE or THEATER_UPROJECT_TEMPLATE env not set")
