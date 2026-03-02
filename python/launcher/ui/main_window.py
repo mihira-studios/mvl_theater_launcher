@@ -236,7 +236,7 @@ class MainWindow(QMainWindow):
         self._build_pages()
     
     def _show_script_breakdown(self):
-        self.crumb_current.setText("Script Breakdown")
+        #self.crumb_current.setText("Script Breakdown")
         self.stack.setCurrentWidget(self.script_breakdown_page)
 
     def _logout_clicked(self):
@@ -277,8 +277,8 @@ class MainWindow(QMainWindow):
         on_projects = (self.stack.currentWidget() == self.projects_page)
         on_script_breakdown = (self.stack.currentWidget() == self.script_breakdown_page)
 
-        if on_projects:
-            self.crumb_projects.setText("Projects")
+        if on_projects or on_script_breakdown:
+            self.crumb_projects.setText("Projects" if on_projects else "Script Breakdown")
             self.crumb_sep.setVisible(False)
             self.crumb_current.setVisible(False)
             # optional: disable clicking when already on projects
@@ -483,6 +483,7 @@ class MainWindow(QMainWindow):
 
         self.stack.addWidget(self.projects_page)
         self.stack.addWidget(self.sequences_page)
+        self.stack.addWidget(self.script_breakdown_page) 
 
         self.projects_page.action.connect(self._on_projects_action)
         self.sequences_page.action.connect(self._on_sequences_action)
