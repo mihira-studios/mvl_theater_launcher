@@ -511,10 +511,10 @@ class MainWindow(QMainWindow):
         if action == "open":
             if os.environ.get("THEATER_EXECUTABLE") and os.environ.get("THEATER_UPROJECT_TEMPLATE"):
                 ue_editor = os.path.join(os.environ.get("THEATER_HOME")) #, r"Engine\Binaries\Win64\UnrealEditor.exe") 
-                uproject = os.environ.get("THEATER_UPROJECT_TMEPLATE") 
-                service = self._ctx.theater_service.launch(ue_editoclr,uproject,["-MVLEditor"], env=env)
+                uproject = os.environ.get("THEATER_UPROJECT_TEMPLATE") 
+                service = self._ctx.theater_service.launch(ue_editor, uproject, ["-MVLEditor"], env=env)
             else:
-                print(f"THEATER_EXECUTABLE or THEATER_UPROJECT_TMEPLATE env not set")
+                print(f"THEATER_EXECUTABLE or THEATER_UPROJECT_TEMPLATE env not set")
         elif action == "delete":
             print("Delete sequence", sequence_id)
 

@@ -6,6 +6,9 @@ pushd "%~dp0..\"
 
 REM configure domain for VM
 set "MVL_DOMAIN=10.100.0.85"
+set "THEATER_EXECUTABLE=C:\Users\raghavendras\Desktop\workspace\Engine\Binaries\Win64\UnrealEditor.exe"
+set "THEATER_HOME=C:\Users\raghavendras\Desktop\workspace\Engine\Binaries\Win64\UnrealEditor.exe"
+set "THEATER_UPROJECT_TEMPLATE=C:\Users\raghavendras\Documents\Unreal Projects\MyProject\MyProject.uproject"
 
 REM delegate to the common launcher logic
 call "%~dp0start_launcher.bat"
