@@ -1,9 +1,11 @@
 # ui/app_context.py
 from launcher.services.auth_service import AuthService
 from launcher.services.project_service import ProjectService
+from launcher.services.script_breakdown_service import ScriptBreakdownService
 
 from launcher.services.theater_service import TheaterService
 from launcher.services.http_client import HttpClient
+from launcher.services.api_client import ApiClient
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -17,3 +19,5 @@ class AppContext(QObject):
         self.auth_service = AuthService()
         self.project_service = ProjectService(self.auth_service, client)
         self.theater_service = TheaterService(self.auth_service, client)
+        self.api_client = ApiClient(self)
+        self.script_breakdown_service = ScriptBreakdownService(self)
