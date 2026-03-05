@@ -20,4 +20,4 @@ class AppContext(QObject):
         self.project_service = ProjectService(self.auth_service, client)
         self.theater_service = TheaterService(self.auth_service, client)
         self.api_client = ApiClient(self)
-        self.script_breakdown_service = ScriptBreakdownService(self.auth_service, client)
+        self.script_breakdown_service = ScriptBreakdownService(self)
