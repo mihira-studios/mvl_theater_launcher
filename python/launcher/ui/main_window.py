@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self.projects_container)
         self.stack.setAutoFillBackground(False)
         self.stack.setObjectName("MainStack")
-        self.stack.currentChanged.connect(lambda _: self._update_breadcrumb())
+        self.stack.currentChanged.connect(self._on_stack_changed)
         container_layout.addWidget(self.stack)
 
         outer.addWidget(self.projects_container)
@@ -226,7 +226,6 @@ class MainWindow(QMainWindow):
         self.new_project_button = QPushButton("New Project", central)
         self.new_project_button.setObjectName("NewProjectButton")
         self.new_project_button.clicked.connect(self._show_script_breakdown)
-        # TODO: connect to "create project" flow when ready
         bottom.addWidget(self.new_project_button)
 
         outer.addLayout(bottom)
@@ -234,10 +233,30 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self._build_pages()
+        self.script_breakdown_page.results_ready.connect(self._on_breakdown_results_ready)
+
+    def _on_breakdown_results_ready(self, ready: bool):
+        if self.stack.currentWidget() == self.script_breakdown_page:
+            self.new_project_button.setEnabled(ready)
+
+    def _on_stack_changed(self, _):
+        self._update_breadcrumb()
+        on_breakdown = self.stack.currentWidget() == self.script_breakdown_page
+        if on_breakdown:
+            self.new_project_button.setText("Save")
+            self.new_project_button.setEnabled(False)
+            self.new_project_button.clicked.disconnect()
+            self.new_project_button.clicked.connect(self.script_breakdown_page.save)
+        else:
+            self.new_project_button.setText("New Project")
+            self.new_project_button.setEnabled(True)
+            self.new_project_button.clicked.disconnect()
+            self.new_project_button.clicked.connect(self._show_script_breakdown)
     
     def _show_script_breakdown(self):
         self.crumb_current.setText("Script Breakdown")
         self.stack.setCurrentWidget(self.script_breakdown_page)
+        self.new_project_button.setEnabled(False)
 
     def _logout_clicked(self):
         self._on_logout("Logged out.", self)
@@ -284,7 +303,7 @@ class MainWindow(QMainWindow):
             self.crumb_projects.setEnabled(False)
             self.crumb_sep.setVisible(False)
             self.crumb_current.setVisible(False)
-            
+
         elif on_script_breakdown:
             self.crumb_projects.setText("Projects")
             self.crumb_projects.setEnabled(True)
@@ -308,7 +327,8 @@ class MainWindow(QMainWindow):
     def _set_loading(self, loading: bool, message: str = ""):
         enabled = not loading
         self.refresh_button.setEnabled(enabled)
-        self.new_project_button.setEnabled(enabled)
+        if self.stack.currentWidget() != self.script_breakdown_page:
+            self.new_project_button.setEnabled(enabled)
         self.stack.setEnabled(enabled)
         self.status_label.setText(message)
 

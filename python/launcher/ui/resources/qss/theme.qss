@@ -190,6 +190,11 @@ QPushButton#NewProjectButton {
     font-size: 14px;
     border: none;
 }
+QPushButton#NewProjectButton:disabled {
+    background-color: #2A2D34;
+    color: #4A4D5A;
+    border: 1px solid #33363F;
+}
 
 QPushButton#NewProjectButton:hover {
     background-color: #9A71FF;

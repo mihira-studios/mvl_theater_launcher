@@ -30,6 +30,7 @@ class BreakdownWorker(QThread):
 class ScriptBreakdownPage(QWidget):
     # Signal to notify main_window to go back
     back_requested = pyqtSignal()
+    results_ready = pyqtSignal(bool)
 
     def __init__(self, ctx, parent=None):
         super().__init__(parent)
@@ -56,11 +57,6 @@ class ScriptBreakdownPage(QWidget):
         upload_row.addWidget(self.lbl_file)
         upload_row.addStretch()
         root.addLayout(upload_row)
-
-        # --- Status ---
-        self.lbl_status = QLabel("")
-        self.lbl_status.setObjectName("StatusLabelProjects")
-        root.addWidget(self.lbl_status)
 
         # --- Metrics row ---
         metrics_row = QHBoxLayout()
@@ -135,7 +131,7 @@ class ScriptBreakdownPage(QWidget):
             return
 
         self.lbl_file.setText(f"📄 {os.path.basename(path)}")
-        self.lbl_status.setText("Sending to backend...")
+        print("Sending to backend...")
         self.btn_upload.setEnabled(False)
         self.btn_upload.setText("⏳ Processing...")
         self._clear_results()
@@ -164,11 +160,16 @@ class ScriptBreakdownPage(QWidget):
             self.scene_table.setItem(row, 0, num)
             self.scene_table.setItem(row, 1, QTableWidgetItem(scene))
 
-        self.lbl_status.setText(f"✅ Done — {result.total_scenes} scenes, {result.total_characters} characters.")
         self._reset_button()
+        has_results = (
+            result.total_pages > 0
+            and result.total_scenes > 0
+            and result.total_characters > 0
+        )
+        self.results_ready.emit(has_results)
 
     def _on_error(self, msg: str):
-        self.lbl_status.setText(f"❌ {msg}")
+        print(f"❌ {msg}")
         self._reset_button()
 
     def _reset_button(self):
@@ -181,3 +182,7 @@ class ScriptBreakdownPage(QWidget):
         self.lbl_chars[1].setText("-")
         self.char_table.setRowCount(0)
         self.scene_table.setRowCount(0)
+        self.results_ready.emit(False)
+
+    def save(self):
+        print("Save clicked")
