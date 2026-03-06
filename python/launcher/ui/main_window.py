@@ -236,7 +236,7 @@ class MainWindow(QMainWindow):
         self._build_pages()
     
     def _show_script_breakdown(self):
-        #self.crumb_current.setText("Script Breakdown")
+        self.crumb_current.setText("Script Breakdown")
         self.stack.setCurrentWidget(self.script_breakdown_page)
 
     def _logout_clicked(self):
@@ -274,26 +274,30 @@ class MainWindow(QMainWindow):
         return menu
 
     def _update_breadcrumb(self):
-        on_projects = (self.stack.currentWidget() == self.projects_page)
-        on_script_breakdown = (self.stack.currentWidget() == self.script_breakdown_page)
+        current = self.stack.currentWidget()
+        on_projects = (current == self.projects_page)
+        on_script_breakdown = (current == self.script_breakdown_page)
+        on_sequences = (current == self.sequences_page)
 
-        if on_projects or on_script_breakdown:
-            self.crumb_projects.setText("Projects" if on_projects else "Script Breakdown")
+        if on_projects:
+            self.crumb_projects.setText("Projects")
+            self.crumb_projects.setEnabled(False)
             self.crumb_sep.setVisible(False)
             self.crumb_current.setVisible(False)
-            # optional: disable clicking when already on projects
-            self.crumb_projects.setEnabled(False)
-        else:
-            # sequences page
-            proj = None
-            if getattr(self, "_current_project_id", None):
-                proj = self._projects_by_id.get(self._current_project_id)
-
+            
+        elif on_script_breakdown:
+            self.crumb_projects.setText("Projects")
             self.crumb_projects.setEnabled(True)
             self.crumb_sep.setVisible(True)
             self.crumb_current.setVisible(True)
+            self.crumb_current.setText("Script Breakdown")
 
+        elif on_sequences:
+            proj = self._projects_by_id.get(getattr(self, "_current_project_id", None))
             self.crumb_projects.setText("Projects")
+            self.crumb_projects.setEnabled(True)
+            self.crumb_sep.setVisible(True)
+            self.crumb_current.setVisible(True)
             self.crumb_current.setText(proj.name if proj else "Sequences")
 
     def _on_section_clicked(self):
