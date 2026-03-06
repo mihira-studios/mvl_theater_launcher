@@ -479,7 +479,7 @@ class MainWindow(QMainWindow):
     def _build_pages(self):
         self.projects_page = CardListPage(make_card=self._make_project_card, show_back=False)
         self.sequences_page = CardListPage(make_card=self._make_sequence_card, show_back=True)
-        self.script_breakdown_page = ScriptBreakdownPage()
+        self.script_breakdown_page = ScriptBreakdownPage(ctx=self._ctx)
 
         self.stack.addWidget(self.projects_page)
         self.stack.addWidget(self.sequences_page)

@@ -1,29 +1,31 @@
-"""
-launcher/services/breakdown_service.py
-"""
+from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
+
 from launcher.domain.script_breakdown import ScriptBreakdown
-from launcher.services.auth_service import AuthService
-from launcher.services.http_client import HttpClient
+
+if TYPE_CHECKING:
+    from launcher.ui.app_context import AppContext
 
 
 class ScriptBreakdownService:
-    def __init__(self, auth: AuthService, client: HttpClient):
-        self._auth = auth
-        self._client = client
+
+    def __init__(self, ctx: AppContext):
+        self._ctx = ctx
 
     def parse(self, pdf_path: str) -> ScriptBreakdown:
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
         with open(pdf_path, "rb") as f:
             files = {
                 "file": (os.path.basename(pdf_path), f, "application/pdf")
             }
-            # Use auth headers just like your other services
-            response = self._client.post(
-                "/api/v1/script/parse",
+            response = self._ctx.api_client.request(
+                "POST",
+                "/script/parse",
                 files=files,
-                headers=self._auth.auth_headers(),
-                timeout=60.0
             )
 
         response.raise_for_status()

@@ -14,10 +14,10 @@ class BreakdownWorker(QThread):
     success = pyqtSignal(object)
     error = pyqtSignal(str)
 
-    def __init__(self, pdf_path: str, parent=None):
+    def __init__(self, pdf_path: str, ctx, parent=None):
         super().__init__(parent)
         self._pdf_path = pdf_path
-        self._service = ScriptBreakdownService()
+        self._service = ctx.script_breakdown_service
 
     def run(self):
         try:
@@ -31,8 +31,9 @@ class ScriptBreakdownPage(QWidget):
     # Signal to notify main_window to go back
     back_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, ctx, parent=None):
         super().__init__(parent)
+        self._ctx = ctx
         self._worker = None
         self._build_ui()
 
@@ -139,7 +140,7 @@ class ScriptBreakdownPage(QWidget):
         self.btn_upload.setText("⏳ Processing...")
         self._clear_results()
 
-        self._worker = BreakdownWorker(path, self)
+        self._worker = BreakdownWorker(path, self._ctx, self)
         self._worker.success.connect(self._on_success)
         self._worker.error.connect(self._on_error)
         self._worker.start()
