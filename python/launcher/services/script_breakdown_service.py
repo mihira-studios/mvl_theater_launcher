@@ -31,3 +31,32 @@ class ScriptBreakdownService:
         response.raise_for_status()
         data = response.json()
         return ScriptBreakdown(**data)
+
+    def save_project(self, name: str, code: str, project_type: str, breakdown: ScriptBreakdown):
+        payload = {
+            "name": name,
+            "code": code,
+            "type": project_type,
+            "description": (
+                f"Pages: {breakdown.total_pages} | "
+                f"Scenes: {breakdown.total_scenes} | "
+                f"Characters: {breakdown.total_characters}"
+            ),
+            "status": "Active",
+            "archived": False,
+            "config": {
+                "total_pages": breakdown.total_pages,
+                "total_scenes": breakdown.total_scenes,
+                "total_characters": breakdown.total_characters,
+                "scenes": breakdown.scenes,
+                "character_appearances": breakdown.character_appearances,
+            },
+        }
+
+        response = self._ctx.api_client.request(
+            "POST",
+            "/projects/",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()

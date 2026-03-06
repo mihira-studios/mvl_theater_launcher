@@ -336,3 +336,46 @@ QToolButton#UserInitialButton::menu-indicator {
     image: none;
     width: 0px;
 }
+
+QLineEdit#BreakdownLineEdit {
+    background-color: #2A2D34;
+    border: 1px solid #3A3D46;
+    border-radius: 8px;
+    padding: 4px 12px;
+    color: #E5E7F0;
+    font-size: 13px;
+}
+
+QLineEdit#BreakdownLineEdit:focus {
+    border: 1px solid #8D63FF;
+}
+
+QLineEdit#BreakdownLineEdit:disabled {
+    color: #4A4D5A;
+    border-color: #2A2D34;
+}
+
+QComboBox#BreakdownComboBox {
+    background-color: #2A2D34;
+    border: 1px solid #3A3D46;
+    border-radius: 8px;
+    padding: 4px 12px;
+    color: #E5E7F0;
+    font-size: 13px;
+}
+
+QComboBox#BreakdownComboBox:focus {
+    border: 1px solid #8D63FF;
+}
+
+QComboBox#BreakdownComboBox::drop-down {
+    border: none;
+    padding-right: 8px;
+}
+
+QComboBox#BreakdownComboBox QAbstractItemView {
+    background-color: #2A2D34;
+    border: 1px solid #3A3D46;
+    color: #E5E7F0;
+    selection-background-color: #3C3F4A;
+}

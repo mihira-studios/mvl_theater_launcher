@@ -2,12 +2,13 @@ import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QSplitter, QSizePolicy
+    QFrame, QSplitter, QLineEdit, QComboBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
-from launcher.services.script_breakdown_service import ScriptBreakdownService
+
+PROJECT_TYPES = ["Film", "Series", "Short", "Game", "Commercial", "Custom"]
 
 
 class BreakdownWorker(QThread):
@@ -27,8 +28,29 @@ class BreakdownWorker(QThread):
             self.error.emit(str(e))
 
 
+class SaveProjectWorker(QThread):
+    success = pyqtSignal(object)
+    error = pyqtSignal(str)
+
+    def __init__(self, ctx, name: str, code: str, project_type: str, breakdown, parent=None):
+        super().__init__(parent)
+        self._ctx = ctx
+        self._name = name
+        self._code = code
+        self._type = project_type
+        self._breakdown = breakdown
+
+    def run(self):
+        try:
+            result = self._ctx.script_breakdown_service.save_project(
+                self._name, self._code, self._type, self._breakdown
+            )
+            self.success.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class ScriptBreakdownPage(QWidget):
-    # Signal to notify main_window to go back
     back_requested = pyqtSignal()
     results_ready = pyqtSignal(bool)
 
@@ -36,6 +58,8 @@ class ScriptBreakdownPage(QWidget):
         super().__init__(parent)
         self._ctx = ctx
         self._worker = None
+        self._save_worker = None
+        self._last_result = None
         self._build_ui()
 
     def _build_ui(self):
@@ -43,7 +67,7 @@ class ScriptBreakdownPage(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(16)
 
-        # --- Upload button ---
+        # --- Upload row ---
         self.btn_upload = QPushButton("⬆  Upload & Breakdown")
         self.btn_upload.setObjectName("PrimaryButton")
         self.btn_upload.setFixedWidth(200)
@@ -58,6 +82,47 @@ class ScriptBreakdownPage(QWidget):
         upload_row.addStretch()
         root.addLayout(upload_row)
 
+        # --- Project fields row ---
+        fields_row = QHBoxLayout()
+        fields_row.setSpacing(12)
+
+        self.input_name = QLineEdit()
+        self.input_name.setObjectName("BreakdownLineEdit")
+        self.input_name.setPlaceholderText("Project Name")
+        self.input_name.setFixedHeight(36)
+        self.input_name.textChanged.connect(self._check_save_ready)
+
+        self.input_code = QLineEdit()
+        self.input_code.setObjectName("BreakdownLineEdit")
+        self.input_code.setPlaceholderText("Project Code  (e.g. BLR)")
+        self.input_code.setFixedHeight(36)
+        self.input_code.setMaxLength(10)
+        self.input_code.textChanged.connect(self._check_save_ready)
+
+        self.combo_type = QComboBox()
+        self.combo_type.setObjectName("BreakdownComboBox")
+        self.combo_type.setFixedHeight(36)
+        self.combo_type.addItems(PROJECT_TYPES)
+        self.combo_type.currentTextChanged.connect(self._on_type_changed)
+
+        self.input_custom_type = QLineEdit()
+        self.input_custom_type.setObjectName("BreakdownLineEdit")
+        self.input_custom_type.setPlaceholderText("Enter custom type...")
+        self.input_custom_type.setFixedHeight(36)
+        self.input_custom_type.setVisible(False)
+        self.input_custom_type.textChanged.connect(self._check_save_ready)
+
+        fields_row.addWidget(self.input_name, 2)
+        fields_row.addWidget(self.input_code, 1)
+        fields_row.addWidget(self.combo_type, 1)
+        fields_row.addWidget(self.input_custom_type, 1)
+        root.addLayout(fields_row)
+
+        # --- Status ---
+        self.lbl_status = QLabel("")
+        self.lbl_status.setObjectName("StatusLabelProjects")
+        root.addWidget(self.lbl_status)
+
         # --- Metrics row ---
         metrics_row = QHBoxLayout()
         self.lbl_pages = self._metric_card("Pages", "-")
@@ -70,7 +135,6 @@ class ScriptBreakdownPage(QWidget):
         # --- Splitter: characters | scenes ---
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Characters table
         char_frame = QFrame()
         char_layout = QVBoxLayout(char_frame)
         char_layout.setContentsMargins(0, 0, 0, 0)
@@ -80,7 +144,6 @@ class ScriptBreakdownPage(QWidget):
         char_layout.addWidget(self.char_table)
         splitter.addWidget(char_frame)
 
-        # Scenes table
         scene_frame = QFrame()
         scene_layout = QVBoxLayout(scene_frame)
         scene_layout.setContentsMargins(0, 0, 0, 0)
@@ -125,15 +188,37 @@ class ScriptBreakdownPage(QWidget):
 
     # --- Logic ---
 
+    def _on_type_changed(self, text: str):
+        self.input_custom_type.setVisible(text == "Custom")
+        self._check_save_ready()
+
+    def _check_save_ready(self):
+        """Enable Save only when breakdown has results AND all fields are filled."""
+        has_breakdown = (
+            self._last_result is not None
+            and self._last_result.total_pages > 0
+            and self._last_result.total_scenes > 0
+            and self._last_result.total_characters > 0
+        )
+        has_name = bool(self.input_name.text().strip())
+        has_code = bool(self.input_code.text().strip())
+        type_text = self.combo_type.currentText()
+        has_type = (
+            bool(self.input_custom_type.text().strip())
+            if type_text == "Custom"
+            else True
+        )
+        self.results_ready.emit(has_breakdown and has_name and has_code and has_type)
+
     def _browse_and_parse(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select Script PDF", "", "PDF Files (*.pdf)")
         if not path:
             return
 
         self.lbl_file.setText(f"📄 {os.path.basename(path)}")
-        print("Sending to backend...")
         self.btn_upload.setEnabled(False)
         self.btn_upload.setText("⏳ Processing...")
+        self._last_result = None
         self._clear_results()
 
         self._worker = BreakdownWorker(path, self._ctx, self)
@@ -142,6 +227,8 @@ class ScriptBreakdownPage(QWidget):
         self._worker.start()
 
     def _on_success(self, result):
+        self._last_result = result
+
         self.lbl_pages[1].setText(str(result.total_pages))
         self.lbl_scenes[1].setText(str(result.total_scenes))
         self.lbl_chars[1].setText(str(result.total_characters))
@@ -161,12 +248,7 @@ class ScriptBreakdownPage(QWidget):
             self.scene_table.setItem(row, 1, QTableWidgetItem(scene))
 
         self._reset_button()
-        has_results = (
-            result.total_pages > 0
-            and result.total_scenes > 0
-            and result.total_characters > 0
-        )
-        self.results_ready.emit(has_results)
+        self._check_save_ready()
 
     def _on_error(self, msg: str):
         print(f"❌ {msg}")
@@ -185,4 +267,46 @@ class ScriptBreakdownPage(QWidget):
         self.results_ready.emit(False)
 
     def save(self):
-        print("Save clicked")
+        if not self._last_result:
+            return
+
+        name = self.input_name.text().strip()
+        code = self.input_code.text().strip().upper()
+        type_text = self.combo_type.currentText()
+        project_type = (
+            self.input_custom_type.text().strip()
+            if type_text == "Custom"
+            else type_text
+        )
+
+        if not name or not code or not project_type:
+            self.lbl_status.setText("❌ Please fill in all project fields.")
+            return
+
+        self.lbl_status.setText("💾 Saving project...")
+        self.btn_upload.setEnabled(False)
+        self.results_ready.emit(False)
+
+        self._save_worker = SaveProjectWorker(
+            self._ctx, name, code, project_type, self._last_result, self
+        )
+        self._save_worker.success.connect(self._on_save_success)
+        self._save_worker.error.connect(self._on_save_error)
+        self._save_worker.start()
+
+    def _on_save_success(self, project):
+        self.lbl_status.setText(f"✅ Project '{project.get('name')}' created successfully.")
+        self._reset_button()
+        # Reset form for a fresh entry
+        self.input_name.clear()
+        self.input_code.clear()
+        self.combo_type.setCurrentIndex(0)
+        self.input_custom_type.clear()
+        self._last_result = None
+        self._clear_results()
+        self.lbl_file.setText("No file selected")
+
+    def _on_save_error(self, msg: str):
+        self.lbl_status.setText(f"❌ Save failed: {msg}")
+        self._reset_button()
+        self._check_save_ready()
