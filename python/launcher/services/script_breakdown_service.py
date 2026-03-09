@@ -59,4 +59,18 @@ class ScriptBreakdownService:
             json=payload,
         )
         response.raise_for_status()
-        return response.json()
+        project = response.json()
+
+        user_kc_id = self._ctx.auth_service._current_user.id
+        access_response = self._ctx.api_client.request(
+            "POST",
+            "/projects/access",
+            json={
+                "project_id": project["id"],
+                "user_kc_id": user_kc_id,
+                "role": "admin",
+            },
+        )
+        access_response.raise_for_status()
+
+        return project

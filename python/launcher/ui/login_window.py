@@ -74,7 +74,7 @@ class LoginWindow(QWidget):
         logo_label.setObjectName("LogoLabel")
         logo_label.setFixedSize(260, 180)
 
-        logo_pix = QPixmap(icon_path("mihira_logo.png"))
+        logo_pix = QPixmap(icon_path("app_icon.png"))
         if not logo_pix.isNull():
             logo_label.setPixmap(
                 logo_pix.scaled(
