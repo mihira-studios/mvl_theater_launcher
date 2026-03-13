@@ -32,7 +32,7 @@ class ScriptBreakdownService:
         data = response.json()
         return ScriptBreakdown(**data)
 
-    def save_project(self, name: str, code: str, project_type: str, breakdown: ScriptBreakdown):
+    def save_project(self, name: str, code: str, project_type: str, breakdown: ScriptBreakdown, ai_result):
         payload = {
             "name": name,
             "code": code,
@@ -50,6 +50,7 @@ class ScriptBreakdownService:
                 "total_characters": breakdown.total_characters,
                 "scenes": breakdown.scenes,
                 "character_appearances": breakdown.character_appearances,
+                "ai_analysis": ai_result,
             },
         }
 

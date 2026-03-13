@@ -26,6 +26,8 @@ def _get_config_path() -> Path:
 _cfg = configparser.ConfigParser()
 _cfg.read(_get_config_path())
 
+AI_API_KEY = _cfg.get("AI", "openrouter_api_key", fallback="")
+
 # MVL_DOMAIN: env var takes priority (set by .bat for devs)
 # falls back to config.ini (used by exe for testers)
 DOMAIN = os.getenv("MVL_DOMAIN") or _cfg.get("Network", "mvl_domain", fallback="localhost")

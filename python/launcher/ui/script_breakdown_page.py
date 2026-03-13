@@ -1,12 +1,14 @@
 import os
+import json
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFrame, QSplitter, QLineEdit, QComboBox
+    QFrame, QSplitter, QLineEdit, QComboBox, QTextEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
+from launcher.services.ai_service import analyse_breakdown
 
 PROJECT_TYPES = ["Film", "Series", "Short", "Game", "Commercial", "Custom"]
 
@@ -28,22 +30,40 @@ class BreakdownWorker(QThread):
             self.error.emit(str(e))
 
 
+class AIWorker(QThread):
+    success = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+    def __init__(self, scenes: list, character_appearances: dict, parent=None):
+        super().__init__(parent)
+        self._scenes = scenes
+        self._character_appearances = character_appearances
+
+    def run(self):
+        try:
+            result = analyse_breakdown(self._scenes, self._character_appearances)
+            self.success.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class SaveProjectWorker(QThread):
     success = pyqtSignal(object)
     error = pyqtSignal(str)
 
-    def __init__(self, ctx, name: str, code: str, project_type: str, breakdown, parent=None):
+    def __init__(self, ctx, name: str, code: str, project_type: str, breakdown, ai_result, parent=None):
         super().__init__(parent)
         self._ctx = ctx
         self._name = name
         self._code = code
         self._type = project_type
         self._breakdown = breakdown
+        self._ai_result = ai_result
 
     def run(self):
         try:
             result = self._ctx.script_breakdown_service.save_project(
-                self._name, self._code, self._type, self._breakdown
+                self._name, self._code, self._type, self._breakdown, self._ai_result
             )
             self.success.emit(result)
         except Exception as e:
@@ -58,8 +78,12 @@ class ScriptBreakdownPage(QWidget):
         super().__init__(parent)
         self._ctx = ctx
         self._worker = None
+        self._ai_worker = None
         self._save_worker = None
         self._last_result = None
+        self._last_ai_result = None 
+        self._parse_done = False 
+        self._ai_done = False  
         self._build_ui()
 
     def _build_ui(self):
@@ -132,7 +156,6 @@ class ScriptBreakdownPage(QWidget):
             metrics_row.addWidget(card)
         root.addLayout(metrics_row)
 
-        # --- Splitter: characters | scenes ---
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         char_frame = QFrame()
@@ -153,10 +176,31 @@ class ScriptBreakdownPage(QWidget):
         scene_layout.addWidget(self.scene_table)
         splitter.addWidget(scene_frame)
 
-        splitter.setSizes([300, 500])
-        root.addWidget(splitter)
+        ai_frame = QFrame()
+        ai_frame.setObjectName("ProjectsContainer")
+        ai_layout = QVBoxLayout(ai_frame)
+        ai_layout.setContentsMargins(12, 12, 12, 12)
+        ai_layout.setSpacing(8)
 
-    # --- Helpers ---
+        ai_header = QHBoxLayout()
+        ai_title = self._section_label("🤖 AI Analysis")
+        self.lbl_ai_status = QLabel("Upload a script to begin.")
+        self.lbl_ai_status.setObjectName("StatusLabelProjects")
+        ai_header.addWidget(ai_title)
+        ai_header.addStretch()
+        ai_header.addWidget(self.lbl_ai_status)
+        ai_layout.addLayout(ai_header)
+
+        self.ai_table = self._make_table(["#", "Scene Summary", "Recommended Shots"])
+        self.ai_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.ai_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.ai_table.setWordWrap(True)
+        self.ai_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        ai_layout.addWidget(self.ai_table)
+
+        splitter.addWidget(ai_frame)
+        splitter.setSizes([250, 350, 400])
+        root.addWidget(splitter)
 
     def _make_table(self, headers: list) -> QTableWidget:
         t = QTableWidget()
@@ -186,20 +230,18 @@ class ScriptBreakdownPage(QWidget):
         lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         return lbl
 
-    # --- Logic ---
-
     def _on_type_changed(self, text: str):
         self.input_custom_type.setVisible(text == "Custom")
         self._check_save_ready()
 
     def _check_save_ready(self):
-        """Enable Save only when breakdown has results AND all fields are filled."""
         has_breakdown = (
             self._last_result is not None
             and self._last_result.total_pages > 0
             and self._last_result.total_scenes > 0
             and self._last_result.total_characters > 0
         )
+        has_ai = self._last_ai_result is not None
         has_name = bool(self.input_name.text().strip())
         has_code = bool(self.input_code.text().strip())
         type_text = self.combo_type.currentText()
@@ -208,7 +250,9 @@ class ScriptBreakdownPage(QWidget):
             if type_text == "Custom"
             else True
         )
-        self.results_ready.emit(has_breakdown and has_name and has_code and has_type)
+        self.results_ready.emit(
+            has_breakdown and has_ai and has_name and has_code and has_type
+        )
 
     def _browse_and_parse(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select Script PDF", "", "PDF Files (*.pdf)")
@@ -222,17 +266,22 @@ class ScriptBreakdownPage(QWidget):
         self._clear_results()
 
         self._worker = BreakdownWorker(path, self._ctx, self)
-        self._worker.success.connect(self._on_success)
+        self._worker.success.connect(self._on_parse_success)
         self._worker.error.connect(self._on_error)
         self._worker.start()
+        
+        self.lbl_ai_status.setText("⏳ Waiting for breakdown...")
 
-    def _on_success(self, result):
+    def _on_parse_success(self, result):
+        self._parse_done = True
         self._last_result = result
 
+        # Update metrics
         self.lbl_pages[1].setText(str(result.total_pages))
         self.lbl_scenes[1].setText(str(result.total_scenes))
         self.lbl_chars[1].setText(str(result.total_characters))
 
+        # Populate characters table
         self.char_table.setRowCount(len(result.character_appearances))
         for row, (name, count) in enumerate(result.character_appearances.items()):
             self.char_table.setItem(row, 0, QTableWidgetItem(name))
@@ -240,6 +289,7 @@ class ScriptBreakdownPage(QWidget):
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.char_table.setItem(row, 1, item)
 
+        # Populate scenes table
         self.scene_table.setRowCount(len(result.scenes))
         for row, scene in enumerate(result.scenes):
             num = QTableWidgetItem(str(row + 1))
@@ -250,8 +300,45 @@ class ScriptBreakdownPage(QWidget):
         self._reset_button()
         self._check_save_ready()
 
+        # Now fire AI worker with actual scene data
+        self.lbl_ai_status.setText("⏳ AI analysing...")
+        self._ai_worker = AIWorker(result.scenes, result.character_appearances, self)
+        self._ai_worker.success.connect(self._on_ai_success)
+        self._ai_worker.error.connect(self._on_ai_error)
+        self._ai_worker.start()
+
+    def _on_ai_success(self, result: dict):
+        self._ai_done = True
+        self._last_ai_result = result
+        scenes = result.get("scenes", [])
+        self.ai_table.setRowCount(len(scenes))
+
+        for row, scene in enumerate(scenes):
+            num = QTableWidgetItem(str(scene.get("scene_number", row + 1)))
+            num.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.ai_table.setItem(row, 0, num)
+
+            summary = QTableWidgetItem(scene.get("summary", ""))
+            summary.setTextAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            self.ai_table.setItem(row, 1, summary)
+
+            shots = scene.get("recommended_shots", [])
+            shots_text = "\n".join(f"• {s}" for s in shots)
+            shots_item = QTableWidgetItem(shots_text)
+            shots_item.setTextAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            self.ai_table.setItem(row, 2, shots_item)
+
+        self.ai_table.resizeRowsToContents()
+        self.lbl_ai_status.setText(f"✅ {len(scenes)} scenes analysed")
+        self._check_save_ready()
+
+    def _on_ai_error(self, msg: str):
+        self.lbl_ai_status.setText(f"❌ AI analysis failed: {msg}")
+        print(f"AI error: {msg}")
+
     def _on_error(self, msg: str):
         print(f"❌ {msg}")
+        self.lbl_ai_status.setText("❌ Breakdown failed.")
         self._reset_button()
 
     def _reset_button(self):
@@ -259,15 +346,20 @@ class ScriptBreakdownPage(QWidget):
         self.btn_upload.setText("⬆  Upload & Breakdown")
 
     def _clear_results(self):
+        self._parse_done = False 
+        self._ai_done = False   
+        self._last_ai_result = None   
         self.lbl_pages[1].setText("-")
         self.lbl_scenes[1].setText("-")
         self.lbl_chars[1].setText("-")
         self.char_table.setRowCount(0)
         self.scene_table.setRowCount(0)
+        self.ai_table.setRowCount(0)
+        self.lbl_ai_status.setText("Upload a script to begin.")
         self.results_ready.emit(False)
 
     def save(self):
-        if not self._last_result:
+        if not self._last_result or not self._last_ai_result:
             return
 
         name = self.input_name.text().strip()
@@ -288,7 +380,7 @@ class ScriptBreakdownPage(QWidget):
         self.results_ready.emit(False)
 
         self._save_worker = SaveProjectWorker(
-            self._ctx, name, code, project_type, self._last_result, self
+            self._ctx, name, code, project_type, self._last_result, self._last_ai_result, self
         )
         self._save_worker.success.connect(self._on_save_success)
         self._save_worker.error.connect(self._on_save_error)
@@ -297,7 +389,6 @@ class ScriptBreakdownPage(QWidget):
     def _on_save_success(self, project):
         self.lbl_status.setText(f"✅ Project '{project.get('name')}' created successfully.")
         self._reset_button()
-        # Reset form for a fresh entry
         self.input_name.clear()
         self.input_code.clear()
         self.combo_type.setCurrentIndex(0)
